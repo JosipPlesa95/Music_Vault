@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Vault — Kolekcija</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Navigacija -->
+<nav>
+  <span class="logo">🎵 Music Vault</span>
+  <div class="nav-links">
+    <a href="dashboard.html" class="active">Kolekcija</a>
+    <a href="add.html">Dodaj album</a>
+    <a href="schema.html">XML Schema</a>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span id="userGreet" style="font-size:13px; color:var(--muted);"></span>
+    <button class="logout-btn" onclick="logout()">Odjava</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <h1 class="page-title">Glazbena kolekcija</h1>
+  <p class="page-sub">Podaci se čuvaju kao XML u localStorage — XPath-style filtriranje u realnom vremenu</p>
+
+  <!-- Statistike -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Ukupno albuma</div>
+      <div class="stat-value" id="statAlbums">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Ukupno pjesama</div>
+      <div class="stat-value" id="statTracks">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Žanrova</div>
+      <div class="stat-value" id="statGenres">0</div>
+    </div>
+  </div>
+
+  <!-- Tabovi -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('albums')">Albumi</div>
+    <div class="tab" onclick="switchTab('xml')">Raw XML</div>
+    <div class="tab" onclick="switchTab('json')">JSON export</div>
+    <div class="tab" onclick="switchTab('xsd')">XML Schema (XSD)</div>
+  </div>
+
+  <!-- Tab: Albumi -->
+  <div id="tab-albums" class="tab-content active">
+
+    <!-- XPath filter info -->
+    <div class="xpath-section">
+      <h3>🔍 XPath-style filtriranje — //album[contains(genre,'...') and year &gt;= '...']</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <input type="text" id="searchInput"
+               placeholder="Pretraži naslov ili izvođača..."
+               style="flex:2; min-width:200px; background:var(--bg); border:1px solid var(--border);
+                      color:var(--text); padding:8px 12px; border-radius:8px; font-size:14px;"
+               oninput="renderAlbums()">
+        <input type="text" id="genreInput"
+               placeholder="Žanr..."
+               style="flex:1; min-width:120px; background:var(--bg); border:1px solid var(--border);
+                      color:var(--text); padding:8px 12px; border-radius:8px; font-size:14px;"
+               oninput="renderAlbums()">
+        <input type="number" id="yearFrom" placeholder="Od god."
+               style="width:100px; background:var(--bg); border:1px solid var(--border);
+                      color:var(--text); padding:8px 12px; border-radius:8px; font-size:14px;"
+               oninput="renderAlbums()">
+        <input type="number" id="yearTo" placeholder="Do god."
+               style="width:100px; background:var(--bg); border:1px solid var(--border);
+                      color:var(--text); padding:8px 12px; border-radius:8px; font-size:14px;"
+               oninput="renderAlbums()">
+      </div>
+      <div class="xpath-examples">
+        <span style="font-size:12px; color:var(--muted);">Brzi filtri:</span>
+        <span class="xpath-chip" onclick="quickFilter('', 'Electronic', '', '')">Electronic</span>
+        <span class="xpath-chip" onclick="quickFilter('', 'Rock', '', '')">Rock</span>
+        <span class="xpath-chip" onclick="quickFilter('', 'Pop', '', '')">Pop</span>
+        <span class="xpath-chip" onclick="quickFilter('', '', '2000', '')">od 2000.</span>
+        <span class="xpath-chip" onclick="quickFilter('', '', '', '1999')">do 1999.</span>
+        <span class="xpath-chip" onclick="quickFilter('', '', '', '')">Reset</span>
+      </div>
+    </div>
+
+    <!-- Rezultat filtra -->
+    <p id="filterResult" style="font-size:13px; color:var(--muted); margin-bottom:1rem;"></p>
+
+    <!-- Grid albuma -->
+    <div class="album-grid" id="albumGrid"></div>
+
+  </div>
+
+  <!-- Tab: Raw XML -->
+  <div id="tab-xml" class="tab-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <p style="font-size:13px; color:var(--muted);">
+        Ovo je stvarni XML string koji se čuva u <code>localStorage('music_db_xml')</code>
+      </p>
+      <button class="btn btn-secondary" onclick="downloadXml()" style="font-size:13px;">
+        ⬇ Preuzmi .xml
+      </button>
+    </div>
+    <div class="xml-viewer" id="xmlViewer"></div>
+  </div>
+
+  <!-- Tab: JSON export -->
+  <div id="tab-json" class="tab-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <p style="font-size:13px; color:var(--muted);">
+        XML → JSON konverzija. Iste podatke možeš izraziti i XML-om i JSON-om.
+      </p>
+      <button class="btn btn-secondary" onclick="downloadJson()" style="font-size:13px;">
+        ⬇ Preuzmi .json
+      </button>
+    </div>
+    <div class="xml-viewer" id="jsonViewer" style="color: #5dcaa5;"></div>
+  </div>
+
+  <!-- Tab: XSD Schema -->
+  <div id="tab-xsd" class="tab-content">
+    <p style="font-size:13px; color:var(--muted); margin-bottom:1rem;">
+      Ovo je XML Schema (XSD) koja definira strukturu <code>music_db.xml</code>.
+      Svaki unos se validira prema ovim pravilima.
+    </p>
+    <div class="xml-viewer" id="xsdViewer"></div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+  // Provjeri autentikaciju
+  requireAuth();
+
+  // Prikaži ime korisnika u navigaciji
+  const user = getCurrentUser();
+  document.getElementById('userGreet').textContent = `Zdravo, ${user.displayName}`;
+
+  // ── Render albuma ────────────────────────────────────────
+  function renderAlbums() {
+    const search   = document.getElementById('searchInput').value;
+    const genre    = document.getElementById('genreInput').value;
+    const yearFrom = document.getElementById('yearFrom').value;
+    const yearTo   = document.getElementById('yearTo').value;
+
+    // Dohvati sve albume (parsira XML iz localStorage)
+    const allAlbums = getAllAlbums();
+
+    // XPath-style filtriranje (definiran u app.js)
+    // Imitira: //album[contains(genre,'X') and year >= Y and year <= Z]
+    const filtered = filterAlbums(allAlbums, { search, genre, yearFrom, yearTo });
+
+    // Statistike
+    document.getElementById('statAlbums').textContent = allAlbums.length;
+    document.getElementById('statTracks').textContent =
+      allAlbums.reduce((s, a) => s + a.tracks.length, 0);
+    document.getElementById('statGenres').textContent =
+      new Set(allAlbums.map(a => a.genre)).size;
+
+    // Poruka o rezultatu
+    document.getElementById('filterResult').textContent =
+      filtered.length === allAlbums.length
+        ? `Prikazuje se svih ${allAlbums.length} albuma`
+        : `XPath filter vratio: ${filtered.length} od ${allAlbums.length} albuma`;
+
+    // Generiraj kartice
+    const grid = document.getElementById('albumGrid');
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1;">
+          <div class="icon">🔍</div>
+          <p>Nema albuma koji odgovaraju filtru.</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = filtered.map(a => `
+      <div class="album-card">
+        <div class="album-cover">${genreEmoji(a.genre)}</div>
+        <div class="album-title">${escHtml(a.title)}</div>
+        <div class="album-artist">${escHtml(a.artist)}</div>
+        <div class="album-meta">
+          <span class="tag">${escHtml(a.year)}</span>
+          <span class="tag genre">${escHtml(a.genre)}</span>
+          <span class="tag" style="color: #efb84c;">${starsHtml(a.rating)}</span>
+        </div>
+        <ul class="track-list">
+          ${a.tracks.slice(0, 4).map(t => `
+            <li>
+              <span><span class="num">${t.num}.</span> ${escHtml(t.name)}</span>
+              <span class="dur">${escHtml(t.duration)}</span>
+            </li>
+          `).join('')}
+          ${a.tracks.length > 4
+            ? `<li style="color:var(--muted); font-style:italic;">
+                 + još ${a.tracks.length - 4} pjesama
+               </li>`
+            : ''}
+        </ul>
+        <div class="card-footer">
+          <span style="font-size:12px; color:var(--muted);">
+            ${a.tracks.length} ${a.tracks.length === 1 ? 'pjesma' : 'pjesme/pesama'}
+          </span>
+          <button class="btn btn-danger"
+                  onclick="handleDelete('${a.id}')">
+            🗑 Obriši
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Brzo postavljanje filtera
+  function quickFilter(search, genre, yearFrom, yearTo) {
+    document.getElementById('searchInput').value = search;
+    document.getElementById('genreInput').value  = genre;
+    document.getElementById('yearFrom').value    = yearFrom;
+    document.getElementById('yearTo').value      = yearTo;
+    renderAlbums();
+  }
+
+  // Brisanje albuma
+  function handleDelete(id) {
+    if (!confirm('Obriši ovaj album iz XML baze?')) return;
+    deleteAlbum(id);   // definiran u app.js
+    renderAlbums();
+    // Osvježi XML viewer ako je otvoren
+    if (document.getElementById('xmlViewer').innerHTML) {
+      loadXmlViewer();
+    }
+  }
+
+  // ── Tabovi ──────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const names = ['albums', 'xml', 'json', 'xsd'];
+      t.classList.toggle('active', names[i] === name);
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+
+    if (name === 'xml')  loadXmlViewer();
+    if (name === 'json') loadJsonViewer();
+    if (name === 'xsd')  loadXsdViewer();
+  }
+
+  function loadXmlViewer() {
+    const raw = localStorage.getItem('music_db_xml') || '';
+    document.getElementById('xmlViewer').innerHTML = highlightXml(prettyXml(raw));
+  }
+
+  function loadJsonViewer() {
+    const json = exportToJson();
+    document.getElementById('jsonViewer').textContent = json;
+  }
+
+  function loadXsdViewer() {
+    document.getElementById('xsdViewer').innerHTML = highlightXml(XSD_SCHEMA);
+  }
+
+  // Formatira XML s uvlakama (za prikaz)
+  function prettyXml(xmlStr) {
+    let indent = 0;
+    return xmlStr
+      .replace(/>\s*</g, '><')
+      .replace(/(<\/?[^?][^>]*>)/g, m => {
+        if (m.startsWith('</')) {
+          indent--;
+          return '\n' + '  '.repeat(Math.max(0, indent)) + m;
+        }
+        const r = '\n' + '  '.repeat(indent) + m;
+        if (!m.endsWith('/>') && !m.startsWith('</')) indent++;
+        return r;
+      })
+      .trim();
+  }
+
+  // Escape HTML za sigurni prikaz
+  function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Inicijalni render
+  renderAlbums();
+</script>
+</body>
+</html>

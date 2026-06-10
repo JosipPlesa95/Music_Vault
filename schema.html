@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Vault — XML Schema</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <span class="logo">🎵 Music Vault</span>
+  <div class="nav-links">
+    <a href="dashboard.html">Kolekcija</a>
+    <a href="add.html">Dodaj album</a>
+    <a href="schema.html" class="active">XML Schema</a>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span id="userGreet" style="font-size:13px; color:var(--muted);"></span>
+    <button class="logout-btn" onclick="logout()">Odjava</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <h1 class="page-title">XML Schema (XSD)</h1>
+  <p class="page-sub">Kompletna schema koja definira i validira strukturu music_db.xml</p>
+
+  <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:2rem; align-items:start;">
+
+    <!-- Objašnjenje -->
+    <div>
+      <div class="form-card" style="max-width:none;">
+
+        <div class="section-title">Struktura elemenata</div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
+
+          <div style="background:var(--bg); border:1px solid var(--border);
+                      border-radius:8px; padding:12px;">
+            <div style="font-weight:600; margin-bottom:6px; color:var(--accent);">
+              &lt;library&gt;
+            </div>
+            <div style="color:var(--muted); padding-left:1rem;">
+              Korijen dokumenta. Sadrži 0..∞ albuma
+              (<code>minOccurs="0" maxOccurs="unbounded"</code>)
+            </div>
+          </div>
+
+          <div style="background:var(--bg); border:1px solid var(--border);
+                      border-radius:8px; padding:12px;">
+            <div style="font-weight:600; margin-bottom:6px; color:var(--accent);">
+              &lt;album id="..."&gt;
+            </div>
+            <div style="color:var(--muted); padding-left:1rem;">
+              Kompleksni tip <code>albumType</code>. Obavezni atribut <code>id</code>
+              (<code>use="required"</code>).
+              Sadrži sekvencijalne elemente (redosljed bitan).
+            </div>
+          </div>
+
+          <div style="background:var(--bg); border:1px solid var(--border);
+                      border-radius:8px; padding:12px;">
+            <div style="font-weight:600; margin-bottom:6px; color: #ef9f27;">
+              &lt;rating&gt; — ratingType
+            </div>
+            <div style="color:var(--muted); padding-left:1rem;">
+              Vlastiti <code>xs:simpleType</code> koji ograničava integer:<br>
+              <code>minInclusive=1</code>, <code>maxInclusive=5</code>
+            </div>
+          </div>
+
+          <div style="background:var(--bg); border:1px solid var(--border);
+                      border-radius:8px; padding:12px;">
+            <div style="font-weight:600; margin-bottom:6px; color: #5dcaa5;">
+              &lt;tracks&gt; / &lt;track num="..."&gt;
+            </div>
+            <div style="color:var(--muted); padding-left:1rem;">
+              <code>tracksType</code> zahtijeva <code>minOccurs="1"</code> — album mora
+              imati barem jednu pjesmu. Atribut <code>num</code> je
+              <code>xs:positiveInteger</code>.
+            </div>
+          </div>
+
+        </div>
+
+        <div class="section-title" style="margin-top:1.5rem;">Tipovi podataka (xs:)</div>
+
+        <table style="width:100%; font-size:13px; border-collapse:collapse;">
+          <thead>
+            <tr style="color:var(--muted); text-align:left;">
+              <th style="padding:6px 8px; border-bottom:1px solid var(--border);">Element</th>
+              <th style="padding:6px 8px; border-bottom:1px solid var(--border);">XSD tip</th>
+            </tr>
+          </thead>
+          <tbody style="color:var(--text);">
+            <tr><td style="padding:5px 8px;"><code>title</code></td>
+                <td style="padding:5px 8px; color:var(--accent);">xs:string</td></tr>
+            <tr><td style="padding:5px 8px;"><code>artist</code></td>
+                <td style="padding:5px 8px; color:var(--accent);">xs:string</td></tr>
+            <tr><td style="padding:5px 8px;"><code>year</code></td>
+                <td style="padding:5px 8px; color:var(--accent);">xs:gYear</td></tr>
+            <tr><td style="padding:5px 8px;"><code>genre</code></td>
+                <td style="padding:5px 8px; color:var(--accent);">xs:string</td></tr>
+            <tr><td style="padding:5px 8px;"><code>rating</code></td>
+                <td style="padding:5px 8px; color:#ef9f27;">ratingType (custom)</td></tr>
+            <tr><td style="padding:5px 8px;"><code>track/@num</code></td>
+                <td style="padding:5px 8px; color:var(--accent);">xs:positiveInteger</td></tr>
+            <tr><td style="padding:5px 8px;"><code>track/duration</code></td>
+                <td style="padding:5px 8px; color:var(--accent);">xs:string</td></tr>
+          </tbody>
+        </table>
+
+      </div>
+    </div>
+
+    <!-- Raw XSD -->
+    <div>
+      <div style="font-size:13px; color:var(--muted); text-transform:uppercase;
+                  letter-spacing:0.5px; margin-bottom:8px;">
+        schema.xsd — kompletan sadržaj
+      </div>
+      <div class="xml-viewer" id="xsdContent" style="max-height:600px;"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+  requireAuth();
+  document.getElementById('userGreet').textContent =
+    `Zdravo, ${getCurrentUser().displayName}`;
+
+  // Prikaži XSD s highlight-om (highlightXml je definiran u app.js)
+  document.getElementById('xsdContent').innerHTML = highlightXml(XSD_SCHEMA);
+</script>
+</body>
+</html>

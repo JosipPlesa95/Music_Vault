@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Vault — Dodaj album</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <span class="logo">🎵 Music Vault</span>
+  <div class="nav-links">
+    <a href="dashboard.html">Kolekcija</a>
+    <a href="add.html" class="active">Dodaj album</a>
+    <a href="schema.html">XML Schema</a>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span id="userGreet" style="font-size:13px; color:var(--muted);"></span>
+    <button class="logout-btn" onclick="logout()">Odjava</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <h1 class="page-title">Dodaj novi album</h1>
+  <p class="page-sub">Popuni formu — podaci se validiraju prema XML Schema pravilima i dodaju u XML bazu</p>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; align-items:start;">
+
+    <!-- Forma -->
+    <div class="form-card">
+
+      <div id="alertBox" class="alert alert-error"></div>
+      <div id="successBox" class="alert alert-success"></div>
+
+      <div class="section-title">📀 Podaci o albumu</div>
+
+      <div class="form-group">
+        <label>Naslov albuma *</label>
+        <input type="text" id="title" placeholder="npr. Abbey Road">
+      </div>
+
+      <div class="form-group">
+        <label>Izvođač *</label>
+        <input type="text" id="artist" placeholder="npr. The Beatles">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Godina *</label>
+          <input type="number" id="year" placeholder="2024" min="1900" max="2025">
+        </div>
+        <div class="form-group">
+          <label>Ocjena (1–5) *</label>
+          <input type="number" id="rating" min="1" max="5" value="4">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Žanr</label>
+        <input type="text" id="genre" placeholder="npr. Rock, Jazz, Electronic...">
+      </div>
+
+      <!-- Trackovi -->
+      <div class="section-title">🎵 Pjesme (min. 1)</div>
+
+      <div id="trackList"></div>
+
+      <button class="btn btn-secondary" onclick="addTrackField()"
+              style="width:100%; margin-bottom:1.5rem;">
+        + Dodaj pjesmu
+      </button>
+
+      <button class="btn btn-primary" onclick="handleSubmit()">
+        Spremi u XML bazu
+      </button>
+
+    </div>
+
+    <!-- Preview XML -->
+    <div>
+      <div style="margin-bottom:1rem;">
+        <div style="font-size:13px; color:var(--muted); text-transform:uppercase;
+                    letter-spacing:0.5px; margin-bottom:8px;">
+          XML preview — što se sprema
+        </div>
+        <div class="xml-viewer" id="xmlPreview" style="max-height:400px;">
+          <span style="color:var(--border);">// Popuni formu za preview...</span>
+        </div>
+      </div>
+
+      <!-- Schema info -->
+      <div style="background:var(--surface); border:1px solid var(--border);
+                  border-radius:10px; padding:1.2rem; font-size:13px; color:var(--muted);">
+        <div style="font-weight:600; color:var(--text); margin-bottom:10px;">
+          📋 XSD Validacija koja se primjenjuje:
+        </div>
+        <ul style="list-style:none; display:flex; flex-direction:column; gap:6px;">
+          <li>✅ <code>title</code>, <code>artist</code> — <code>xs:string</code>, obavezno</li>
+          <li>✅ <code>year</code> — <code>xs:gYear</code> (1900–danas)</li>
+          <li>✅ <code>rating</code> — <code>xs:integer</code>, min=1, max=5</li>
+          <li>✅ <code>track</code> — <code>minOccurs="1"</code> (min 1 pjesma)</li>
+          <li>✅ <code>track/@num</code> — <code>xs:positiveInteger</code></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+  requireAuth();
+
+  const user = getCurrentUser();
+  document.getElementById('userGreet').textContent = `Zdravo, ${user.displayName}`;
+
+  // Drži listu trackova u JS arrayu
+  let tracks = [{ name: '', duration: '' }];
+
+  // ── Render track fieldsova ────────────────────────
+  function renderTrackList() {
+    const container = document.getElementById('trackList');
+    container.innerHTML = tracks.map((t, i) => `
+      <div class="track-entry">
+        <div style="display:flex; gap:8px;">
+          <input type="text" placeholder="Naziv pjesme"
+                 value="${escHtml(t.name)}"
+                 onchange="updateTrack(${i}, 'name', this.value)"
+                 oninput="updateTrack(${i}, 'name', this.value)"
+                 style="flex:2;">
+          <input type="text" placeholder="3:45"
+                 value="${escHtml(t.duration)}"
+                 onchange="updateTrack(${i}, 'duration', this.value)"
+                 oninput="updateTrack(${i}, 'duration', this.value)"
+                 style="flex:1; max-width:90px;">
+        </div>
+        <span style="font-size:13px; color:var(--muted); min-width:24px; text-align:center;">
+          #${i + 1}
+        </span>
+        ${tracks.length > 1
+          ? `<button class="btn btn-danger" onclick="removeTrack(${i})">✕</button>`
+          : '<span></span>'}
+      </div>
+    `).join('');
+
+    updateXmlPreview();
+  }
+
+  function addTrackField() {
+    tracks.push({ name: '', duration: '' });
+    renderTrackList();
+  }
+
+  function removeTrack(i) {
+    tracks.splice(i, 1);
+    renderTrackList();
+  }
+
+  function updateTrack(i, field, val) {
+    tracks[i][field] = val;
+    updateXmlPreview();
+  }
+
+  function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── XML Preview (generira se u realnom vremenu) ───
+  function updateXmlPreview() {
+    const title  = document.getElementById('title').value  || '...';
+    const artist = document.getElementById('artist').value || '...';
+    const year   = document.getElementById('year').value   || '...';
+    const genre  = document.getElementById('genre').value  || '...';
+    const rating = document.getElementById('rating').value || '...';
+
+    const tracksXml = tracks.map((t, i) =>
+      `    <track num="${i+1}">\n` +
+      `      <name>${escHtml(t.name) || '...'}</name>\n` +
+      `      <duration>${escHtml(t.duration) || '...'}</duration>\n` +
+      `    </track>`
+    ).join('\n');
+
+    const xml =
+      `<album id="a_novi">\n` +
+      `  <title>${escHtml(title)}</title>\n` +
+      `  <artist>${escHtml(artist)}</artist>\n` +
+      `  <year>${escHtml(year)}</year>\n` +
+      `  <genre>${escHtml(genre)}</genre>\n` +
+      `  <rating>${escHtml(rating)}</rating>\n` +
+      `  <tracks>\n${tracksXml}\n  </tracks>\n` +
+      `</album>`;
+
+    document.getElementById('xmlPreview').innerHTML = highlightXml(xml);
+  }
+
+  // Slušaj promjene u input fieldovima za live preview
+  ['title', 'artist', 'year', 'genre', 'rating'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateXmlPreview);
+  });
+
+  // ── Submit ────────────────────────────────────────
+  function handleSubmit() {
+    const alertBox   = document.getElementById('alertBox');
+    const successBox = document.getElementById('successBox');
+
+    const albumData = {
+      title:  document.getElementById('title').value.trim(),
+      artist: document.getElementById('artist').value.trim(),
+      year:   document.getElementById('year').value,
+      genre:  document.getElementById('genre').value.trim(),
+      rating: document.getElementById('rating').value,
+      tracks: tracks.filter(t => t.name.trim())
+    };
+
+    // addAlbum() u app.js validira (imitira XSD) i sprema u XML
+    const result = addAlbum(albumData);
+
+    if (!result.ok) {
+      showAlert(alertBox, result.errors.join(' • '));
+      return;
+    }
+
+    showAlert(successBox, '✅ Album uspješno dodan u XML bazu!', 'success');
+
+    // Reset forme
+    document.getElementById('title').value  = '';
+    document.getElementById('artist').value = '';
+    document.getElementById('year').value   = '';
+    document.getElementById('genre').value  = '';
+    document.getElementById('rating').value = '4';
+    tracks = [{ name: '', duration: '' }];
+    renderTrackList();
+  }
+
+  // Inicijalni render
+  renderTrackList();
+</script>
+</body>
+</html>
